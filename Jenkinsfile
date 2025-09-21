@@ -5,6 +5,7 @@ pipeline {
         NETLIFY_SITE_ID = '42b82215-5737-4c79-a9d9-7123475d8a64'
         NETLIFY_AUTH_TOKEN = credentials('netlify-token')
     }
+
     stages {
         stage('Build') {
             agent {
@@ -15,7 +16,6 @@ pipeline {
             }
             steps {
                 sh '''
-                    echo 'Small change'
                     ls -la
                     node --version
                     npm --version
@@ -25,6 +25,7 @@ pipeline {
                 '''
             }
         }
+
         stage('Tests') {
             parallel {
                 stage('Unit Test') {
@@ -57,7 +58,6 @@ pipeline {
                         sh '''
                             npm install serve
                             node_modules/.bin/serve -s build &
-                            sleep 5
                             npx playwright test --reporter=html
                         '''
                     }
@@ -70,7 +70,7 @@ pipeline {
                                 keepAll: false,
                                 reportDir: 'playwright-report',
                                 reportFiles: 'index.html',
-                                reportName: 'playwright HTML Report',
+                                reportName: 'playwright Local',
                                 reportTitles: '',
                                 useWrapperFileDirectly: true
                             ])
@@ -79,6 +79,7 @@ pipeline {
                 }
             }
         }
+
         stage('Deploy') {
             agent {
                 docker {
@@ -91,9 +92,41 @@ pipeline {
                     npm install netlify-cli@20.1.1
                     npx netlify --version
                     echo "Deploying to Netlify site ID: $NETLIFY_SITE_ID"
-                    node_modules/.bin/netlify status 
+                    node_modules/.bin/netlify status
                     node_modules/.bin/netlify deploy --dir=build --prod
                 '''
+            }
+        }
+
+        stage('Prod E2E') {
+            agent {
+                docker {
+                    image 'mcr.microsoft.com/playwright:v1.39.0-jammy'
+                    reuseNode true
+                }
+            }
+            environment {
+                CI_ENVIRONMENT_URL = 'https://stalwart-haupia-9305c5.netlify.app'
+            }
+            steps {
+                sh '''
+                    npx playwright test --reporter=html
+                '''
+            }
+            post {
+                always {
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: false,
+                        icon: '',
+                        keepAll: false,
+                        reportDir: 'playwright-report',
+                        reportFiles: 'index.html',
+                        reportName: 'playwright E2E',
+                        reportTitles: '',
+                        useWrapperFileDirectly: true
+                    ])
+                }
             }
         }
     }
