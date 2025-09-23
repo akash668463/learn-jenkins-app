@@ -37,12 +37,13 @@ pipeline {
                     }
                     steps {
                         sh '''
+                            #test -f build/index.html
                             npm test
                         '''
                     }
                     post {
                         always {
-                            junit 'jest-results/junit.xml'
+                            junit 'jest-results/junit.xml' // Junit report path
                         }
                     }
                 }
@@ -57,23 +58,27 @@ pipeline {
                         sh '''
                             npm install serve
                             node_modules/.bin/serve -s build &
-                            sleep 5
                             npx playwright test --reporter=html
                         '''
                     }
                     post {
                         always {
                             publishHTML([
+                                allowMissing: false,
+                                alwaysLinkToLastBuild: false,
+                                icon: '',
+                                keepAll: false,
                                 reportDir: 'playwright-report',
                                 reportFiles: 'index.html',
-                                reportName: 'playwright Local'
+                                reportName: 'playwright Local',
+                                reportTitles: '',
+                                useWrapperFileDirectly: true
                             ])
                         }
                     }
                 }
             }
         }
-
         stage('Deploy staging') {
             agent {
                 docker {
@@ -87,10 +92,11 @@ pipeline {
                     npx netlify --version
                     echo "Deploying to staging site ID: $NETLIFY_SITE_ID"
                     node_modules/.bin/netlify status
+                    # Deploy and capture the output in JSON format
                     node_modules/.bin/netlify deploy --dir=build --json > deploy-output.json
+                    node_modules/.bin/node-jq -r '.deploy_url' deploy-output.json
                 '''
                 script {
-                    // ✅ Fix returnStdout typo
                     env.STAGING_URL = sh(
                         script: "node_modules/.bin/node-jq -r '.deploy_url' deploy-output.json",
                         returnStdout: true
@@ -98,8 +104,8 @@ pipeline {
                     echo "Staging URL is: ${env.STAGING_URL}"
                 }
             }
+            
         }
-
         stage('staging E2E') {
             agent {
                 docker {
@@ -107,25 +113,32 @@ pipeline {
                     reuseNode true
                 }
             }
+            environment {
+                CI_ENVIRONMENT_URL = "${env.STAGING_URL}"
+            }
             steps {
                 sh '''
-                    echo "Running Playwright tests against $STAGING_URL"
-                    npx playwright test --reporter=html --base-url=$STAGING_URL
+                    npx playwright test --reporter=html --base-url=$CI_ENVIRONMENT_URL
                 '''
             }
             post {
                 always {
                     publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: false,
+                        icon: '',
+                        keepAll: false,
                         reportDir: 'playwright-report',
                         reportFiles: 'index.html',
-                        reportName: 'staging E2E'
+                        reportName: 'staging E2E',
+                        reportTitles: '',
+                        useWrapperFileDirectly: true
                     ])
                 }
             }
         }
-
-        stage('Approval') {
-            steps {
+        stage('Approval'){
+            steps{
                 input message: 'Deploy to Production?', ok: 'Deploy'
             }
         }
@@ -160,15 +173,21 @@ pipeline {
             }
             steps {
                 sh '''
-                    npx playwright test --reporter=html --base-url=$CI_ENVIRONMENT_URL
+                    npx playwright test --reporter=html
                 '''
             }
             post {
                 always {
                     publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: false,
+                        icon: '',
+                        keepAll: false,
                         reportDir: 'playwright-report',
                         reportFiles: 'index.html',
-                        reportName: 'Prod E2E'
+                        reportName: 'Prod E2E',
+                        reportTitles: '',
+                        useWrapperFileDirectly: true
                     ])
                 }
             }
