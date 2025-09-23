@@ -88,16 +88,18 @@ pipeline {
             }
             steps {
                 sh '''
-                    npm install netlify-cli@20.1.1 node-jq
+                    apk add --no-cache jq
+                    npm install netlify-cli@20.1.1
                     npx netlify --version
                     echo "Deploying to staging site ID: $NETLIFY_SITE_ID"
                     node_modules/.bin/netlify status
-                    # Deploy and capture the output in JSON format
                     node_modules/.bin/netlify deploy --dir=build --json > deploy-output.json
-                    node_modules/.bin/node-jq -r '.deploy_url' deploy-output.json
                 '''
-                script{
-                    env.STAGING_URL = sh(script:"node_modules/.bin/node-jq -r '.deploy_url' deploy-output.json",returnStdoubt:true)
+                script {
+                    env.STAGING_URL = sh(
+                        script: "jq -r '.deploy_url' deploy-output.json",
+                        returnStdout: true
+                    ).trim()
                 }
             }
             
@@ -115,7 +117,7 @@ pipeline {
             steps {
                 sh '''
                     npx playwright test --reporter=html --base-url=$CI_ENVIRONMENT_URL
-                '''
+            '''
             }
             post {
                 always {
