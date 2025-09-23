@@ -114,15 +114,13 @@ pipeline {
                 }
             }
             environment {
-                PLAYWRIGHT_TEST_BASE_URL = "${env.STAGING_URL}"
+                CI_ENVIRONMENT_URL = "${env.STAGING_URL}"
             }
             steps {
                 sh '''
-                    echo "Running Playwright E2E tests against $PLAYWRIGHT_TEST_BASE_URL"
                     npx playwright test --reporter=html
                 '''
             }
-
             post {
                 always {
                     publishHTML([
@@ -171,15 +169,13 @@ pipeline {
                 }
             }
             environment {
-                PLAYWRIGHT_TEST_BASE_URL = 'https://stalwart-haupia-9305c5.netlify.app'
+                CI_ENVIRONMENT_URL = 'https://stalwart-haupia-9305c5.netlify.app'
             }
             steps {
                 sh '''
-                    echo "Running Playwright Prod E2E tests against $PLAYWRIGHT_TEST_BASE_URL"
                     npx playwright test --reporter=html
                 '''
             }
-
             post {
                 always {
                     publishHTML([
